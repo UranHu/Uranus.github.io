@@ -1,108 +1,52 @@
 <!DOCTYPE html>
 <html>
+
 <head>
-  <meta charset="utf-8">
-  
-  
+  <meta http-equiv="Content-Type" content="text/html" charset="UTF-8" >
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1"/>
   <title>K8s in Action Notes | Uranus</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-  <meta name="description" content="这里是 Kubernetes in Action 的读书笔记。 Chapter 1 介绍K8s为什么需要K8s?    因为由单体式程序(monolithic)转向微服务式程序，因此需用像K8s这种工具帮助开发者和运维团队。   微服务通过水平扩容来提高请求处理能力，要求能运维上能迅速扩容&#x2F;缩容。 不同的微服务依赖于不同版本的库甚至环境，对于这些资源的隔离需用docker以及K8s这类工具。 K8">
-<meta property="og:type" content="article">
-<meta property="og:title" content="K8s in Action Notes">
-<meta property="og:url" content="https://uranhu.github.io/2021/03/09/K8s-in-Action-Note/index.html">
-<meta property="og:site_name" content="Uranus">
-<meta property="og:description" content="这里是 Kubernetes in Action 的读书笔记。 Chapter 1 介绍K8s为什么需要K8s?    因为由单体式程序(monolithic)转向微服务式程序，因此需用像K8s这种工具帮助开发者和运维团队。   微服务通过水平扩容来提高请求处理能力，要求能运维上能迅速扩容&#x2F;缩容。 不同的微服务依赖于不同版本的库甚至环境，对于这些资源的隔离需用docker以及K8s这类工具。 K8">
-<meta property="og:locale" content="en_US">
-<meta property="og:image" content="https://uranhu.github.io/2021/03/09/K8s-in-Action-Note/k8s_fig1.png">
-<meta property="og:image" content="https://uranhu.github.io/2021/03/09/K8s-in-Action-Note/k8s_fig2.png">
-<meta property="article:published_time" content="2021-03-09T01:57:34.083Z">
-<meta property="article:modified_time" content="2021-03-09T01:57:34.083Z">
-<meta property="article:author" content="Who Ru">
-<meta name="twitter:card" content="summary">
-<meta name="twitter:image" content="https://uranhu.github.io/2021/03/09/K8s-in-Action-Note/k8s_fig1.png">
-  
-    <link rel="alternate" href="/atom.xml" title="Uranus" type="application/atom+xml">
-  
-  
-    <link rel="shortcut icon" href="/favicon.png">
-  
-  
-    
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/typeface-source-code-pro@0.0.71/index.min.css">
+  <meta name="description" content="A cold planet" />
+  <meta name="HandheldFriendly" content="True" />
+  <meta name="MobileOptimized" content="320" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <link rel="stylesheet" type="text/css" href="/css/screen.css" />
+  <link rel="stylesheet" type="text/css" href="//fonts.googleapis.com/css?family=Noto+Serif:400,700,400italic|Open+Sans:700,400" />
+
+  <meta name="generator" content="Uranus">
 
   
   
-<link rel="stylesheet" href="/css/style.css">
+  
 
   
-    
-<link rel="stylesheet" href="/fancybox/jquery.fancybox.min.css">
+</head>
 
-  
-<meta name="generator" content="Hexo 5.4.0"></head>
 
-<body>
-  <div id="container">
-    <div id="wrap">
-      <header id="header">
-  <div id="banner"></div>
-  <div id="header-outer" class="outer">
-    <div id="header-title" class="inner">
-      <h1 id="logo-wrap">
-        <a href="/" id="logo">Uranus</a>
-      </h1>
-      
-        <h2 id="subtitle-wrap">
-          <a href="/" id="subtitle">A cold planet</a>
-        </h2>
-      
+<body class="post-template">
+
+  <header class="site-head"  style="background-image: url(https://mubai.oss-cn-hangzhou.aliyuncs.com/background.jpg)" >
+    <div class="vertical">
+        <div class="site-head-content inner">
+            
+            <h1 class="blog-title">Uranus</h1>
+            <h2 class="blog-description">A cold planet</h2>
+        </div>
     </div>
-    <div id="header-inner" class="inner">
-      <nav id="main-nav">
-        <a id="main-nav-toggle" class="nav-icon"></a>
-        
-          <a class="main-nav-link" href="/">Home</a>
-        
-          <a class="main-nav-link" href="/archives">Archives</a>
-        
-      </nav>
-      <nav id="sub-nav">
-        
-          <a id="nav-rss-link" class="nav-icon" href="/atom.xml" title="RSS Feed"></a>
-        
-        <a id="nav-search-btn" class="nav-icon" title="Search"></a>
-      </nav>
-      <div id="search-form-wrap">
-        <form action="//google.com/search" method="get" accept-charset="UTF-8" class="search-form"><input type="search" name="q" class="search-form-input" placeholder="Search"><button type="submit" class="search-form-submit">&#xF002;</button><input type="hidden" name="sitesearch" value="https://uranhu.github.io"></form>
-      </div>
-    </div>
-  </div>
 </header>
-
-      <div class="outer">
-        <section id="main"><article id="post-K8s-in-Action-Note" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
-  <div class="article-meta">
-    <a href="/2021/03/09/K8s-in-Action-Note/" class="article-date">
-  <time class="dt-published" datetime="2021-03-09T01:57:34.083Z" itemprop="datePublished">2021-03-09</time>
-</a>
-    
-  </div>
-  <div class="article-inner">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 class="p-name article-title" itemprop="headline name">
-      K8s in Action Notes
-    </h1>
   
 
-      </header>
+<main class="content" role="main">
+  <article class="post">
+    <span class="post-meta">
+      <time datetime="2021-03-09T01:57:34.083Z" itemprop="datePublished">
+          2021-03-09
+      </time>
     
-    <div class="e-content article-entry" itemprop="articleBody">
-      
-        <p>这里是 <em>Kubernetes in Action</em> 的读书笔记。</p>
+</span>
+    <h1 class="post-title">K8s in Action Notes</h1>
+    <section class="post-content">
+      <p>这里是 <em>Kubernetes in Action</em> 的读书笔记。</p>
 <h3 id="Chapter-1-介绍K8s"><a href="#Chapter-1-介绍K8s" class="headerlink" title="Chapter 1 介绍K8s"></a>Chapter 1 介绍K8s</h3><p>为什么需要K8s?  </p>
 <ul>
 <li>因为由单体式程序(monolithic)转向微服务式程序，因此需用像K8s这种工具帮助开发者和运维团队。  </li>
@@ -248,113 +192,64 @@
 
 <p>并且，这两种指令都支持<strong>shell</strong>和<strong>exec</strong>两种形式。<br><strong>shell</strong>: ENTRYPOINT node app.js<br><strong>exec</strong>: ENTRYPOINT [“node”, “app,js”]<br>它们两个的区别在于命令是否在一个shell里运行。<br>如果shell中运行，那么PID 1的进程不是命令而是shell。  </p>
 
-      
-    </div>
-    <footer class="article-footer">
-      <a data-url="https://uranhu.github.io/2021/03/09/K8s-in-Action-Note/" data-id="ckn4tlyd80001ddlmaalxgqtf" data-title="K8s in Action Notes" class="article-share-link">Share</a>
-      
-      
-      
-    </footer>
-  </div>
-  
-    
-<nav id="article-nav">
-  
-  
-    <a href="/2021/03/05/hello-world/" id="article-nav-older" class="article-nav-link-wrap">
-      <strong class="article-nav-caption">Older</strong>
-      <div class="article-nav-title">Hello World</div>
-    </a>
-  
-</nav>
-
-  
-</article>
-
-
+    </section>
+    <footer class="post-footer">
+      <section class="author">
+    <h4>Who Ru</h4>
+    <p></p>
 </section>
-        
-          <aside id="sidebar">
-  
+      <section class="share">
+    <h4>Share this post</h4>
+    <a class="icon-twitter" target="_blank" rel="noopener" href="http://twitter.com/share?url=https://uranhu.github.io/2021/03/09/K8s-in-Action-Note/"
+       onclick="window.open(this.href, 'twitter-share', 'width=550,height=235');return false;">
+        <span class="hidden">Twitter</span>
+    </a>
+    <a class="icon-facebook" target="_blank" rel="noopener" href="https://www.facebook.com/sharer/sharer.php?u=https://uranhu.github.io/2021/03/09/K8s-in-Action-Note/"
+       onclick="window.open(this.href, 'facebook-share','width=580,height=296');return false;">
+        <span class="hidden">Facebook</span>
+    </a>
+    <a class="icon-google-plus" target="_blank" rel="noopener" href="https://plus.google.com/share?url=https://uranhu.github.io/2021/03/09/K8s-in-Action-Note/"
+       onclick="window.open(this.href, 'google-plus-share', 'width=490,height=530');return false;">
+        <span class="hidden">Google+</span>
+    </a>
+</section>
+    </footer>
+  </article>
+  <nav class="pagination" role="pagination">
     
+    <span class="page-number">•</span>
+    
+    <a class="older-posts" href="/2021/03/05/hello-world/">
+        Hello World →
+    </a>
+    
+</nav>
+  <div id="comment" class="comments-area">
+    <h1 class="title"><a href="#disqus_comments" name="disqus_comments">Comments</a></h1>
+
+    
+</div>
+</main>
+
 
   
-    
-
+<footer class="site-footer">
   
-    
-  
-    
-  <div class="widget-wrap">
-    <h3 class="widget-title">Archives</h3>
-    <div class="widget">
-      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/03/">March 2021</a></li></ul>
-    </div>
-  </div>
-
-
-  
-    
-  <div class="widget-wrap">
-    <h3 class="widget-title">Recent Posts</h3>
-    <div class="widget">
-      <ul>
-        
-          <li>
-            <a href="/2021/03/09/K8s-in-Action-Note/">K8s in Action Notes</a>
-          </li>
-        
-          <li>
-            <a href="/2021/03/05/hello-world/">Hello World</a>
-          </li>
-        
-      </ul>
-    </div>
-  </div>
-
-  
-</aside>
-        
-      </div>
-      <footer id="footer">
-  
-  <div class="outer">
-    <div id="footer-info" class="inner">
-      
-      &copy; 2021 Who Ru<br>
-      Powered by <a href="https://hexo.io/" target="_blank">Hexo</a>
-    </div>
+  <div class="inner">
+     <section class="copyright">All content copyright <a href="/">Uranus</a> &copy; 2014 &bull; All rights reserved.</section>
+     <section class="poweredby">Proudly published with <a class="icon-ghost" target="_blank" rel="noopener" href="http://zespia.tw/hexo/">Hexo</a></section>
   </div>
 </footer>
 
-    </div>
-    <nav id="mobile-nav">
-  
-    <a href="/" class="mobile-nav-link">Home</a>
-  
-    <a href="/archives" class="mobile-nav-link">Archives</a>
-  
-</nav>
-    
+  <script src="//ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
 
-
-<script src="/js/jquery-3.4.1.min.js"></script>
-
-
-
-  
-<script src="/fancybox/jquery.fancybox.min.js"></script>
-
-
-
-
-<script src="/js/script.js"></script>
+<script type="text/javascript" src="/js/jquery.fitvids.js"></script>
+<script type="text/javascript" src="/js/index.js"></script>
 
 
 
 
 
-  </div>
+
 </body>
 </html>
