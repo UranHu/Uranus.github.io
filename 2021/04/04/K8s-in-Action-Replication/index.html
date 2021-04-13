@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"uranhu.github.io","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="K8s可以在进程crash的时候重启容器，但如果进程没有crash，只是抛出错误或者进程出现了没有预料到的错误，比如死循环，死锁之类的该怎么办？因此要求可以从外部探查应用的健康状况。有三种机制的探针：HTTP GET，要求返回状态码应该是2XX或者3XX；TCP socket，要求可以建立连接；运行容器内的一条命令，要求exit status code为0。不存在一个liveness探针这样的资源">
+<meta property="og:type" content="article">
+<meta property="og:title" content="K8s Replication and other controllers">
+<meta property="og:url" content="https://uranhu.github.io/2021/04/04/K8s-in-Action-Replication/index.html">
+<meta property="og:site_name" content="Uranus">
+<meta property="og:description" content="K8s可以在进程crash的时候重启容器，但如果进程没有crash，只是抛出错误或者进程出现了没有预料到的错误，比如死循环，死锁之类的该怎么办？因此要求可以从外部探查应用的健康状况。有三种机制的探针：HTTP GET，要求返回状态码应该是2XX或者3XX；TCP socket，要求可以建立连接；运行容器内的一条命令，要求exit status code为0。不存在一个liveness探针这样的资源">
+<meta property="og:locale" content="en_US">
+<meta property="article:published_time" content="2021-04-04T13:30:00.000Z">
+<meta property="article:modified_time" content="2021-04-06T01:59:24.285Z">
+<meta property="article:author" content="Who Ru">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://uranhu.github.io/2021/04/04/K8s-in-Action-Replication/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>K8s Replication and other controllers | Uranus</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Uranus</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">A cold planet</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="https://uranhu.github.io/2021/04/04/K8s-in-Action-Replication/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Who Ru">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Uranus">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          K8s Replication and other controllers
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2021-04-04 21:30:00" itemprop="dateCreated datePublished" datetime="2021-04-04T21:30:00+08:00">2021-04-04</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2021-04-06 09:59:24" itemprop="dateModified" datetime="2021-04-06T09:59:24+08:00">2021-04-06</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/K8s/" itemprop="url" rel="index"><span itemprop="name">K8s</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>K8s可以在进程crash的时候重启容器，但如果进程没有crash，只是抛出错误或者进程出现了没有预料到的错误，比如死循环，死锁之类的该怎么办？因此要求可以从外部探查应用的健康状况。<br>有三种机制的探针：HTTP GET，要求返回状态码应该是2XX或者3XX；TCP socket，要求可以建立连接；运行容器内的一条命令，要求exit status code为0。<br>不存在一个liveness探针这样的资源，而是在创建pod的时候附带创建探针。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">apiVersion: v1</span><br><span class="line">kind: pod</span><br><span class="line">metadata:</span><br><span class="line">name: kubia-liveness spec:</span><br><span class="line">containers:</span><br><span class="line">- image: luksa&#x2F;kubia-unhealthy</span><br><span class="line">    name: kubia</span><br><span class="line">    livenessProbe:</span><br><span class="line">      httpGet:</span><br><span class="line">        path: &#x2F;</span><br><span class="line">        port: 8080</span><br></pre></td></tr></table></figure>
+<p>这个pod的yaml带了一个<strong>httpGet</strong>探针，要求K8s定期发送HTTP GET请求到8080端口来监测服务是否健康。<br>查看restart的pod重启之前的日志用<code>kubectl logs &lt;pod_name&gt; --previous</code><br>这个容器的进程会每5次返回500一次，如果对这个pod用describe可以在Events看到因为探针失败而重启<strong>容器</strong>的记录。还可以看到上次被terminated的exit code，这个code 128+x，x是引发terminate的信号编号。<br>Liveness探针的参数可配，比如超时时间，失败数目上限，还有探针在容器启动后多久开始工作(initialDelaySeconds)。<br>探针的配置的一些注意点：<br>1 最好有一个/health之类的路径专门用来处理探针请求，监测整个服务的健康状况。<br>2 探针应该只检查服务的内部状态而不受外部应用影响，比如接数据库的web server，如果数据库坏了，server的探针不应该报失败。<br>3 探针应该轻量，因为探针会被高频次地运行，且探针的计算资源开销是计入整个pod的资源开销的。<br>4 探针自己不需要重试，因为K8s会自动重试探针。</p>
+<p>因为探针失败而重启容器这件事是由承载这个pod的node上的kubelet负责的，K8s Control Plane不参与这个行为。但是如果这个node坏了，必须由Control Plane来为这个crash的node上面的所有pod找一个新的宿主机，但是手动创建的pod不由Control Plane管理，只有kubelet管理。因此需要Replication Controller之类的机制。</p>
+<h2 id="Replication-Controller"><a href="#Replication-Controller" class="headerlink" title="Replication Controller"></a>Replication Controller</h2><p>rc是一种可以为pod维护指定replica数目的资源。rc会持续不断地监测符合某一个label selector的pod的数量，保证这个数量和设置的一样。<br>一个rc由三个重要部分组成：<br>1 一个label selector，决定这个rc管理什么pod<br>2 一个replica count<br>3 一个pod template，用于创建新pod<br>更改rc的label selector和pod template对于正在运行的pod没有影响(变更label selector使得一些pod不受rc管理了应该也算影响才对)。</p>
+<p>一个pod实例不会被挪到别的node，rc只会在一个新node上创建一个全新的pod来替代。  </p>
+<p>用yaml来创造rc</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">apiVersion: v1</span><br><span class="line">kind: ReplicationController</span><br><span class="line">metadata:</span><br><span class="line">  name: kubia</span><br><span class="line">spec:</span><br><span class="line">  replicas: 3</span><br><span class="line">  selector:</span><br><span class="line">    app: kubia </span><br><span class="line">template:</span><br><span class="line">  metadata:</span><br><span class="line">    labels:</span><br><span class="line">      app: kubia</span><br><span class="line">  spec:</span><br><span class="line">    containers:</span><br><span class="line">      - name: kubia</span><br><span class="line">        image: luksa&#x2F;kubia </span><br><span class="line">        ports:</span><br><span class="line">        - containerPort: 8080</span><br></pre></td></tr></table></figure>
+<p>Pod template中的label必须和label selector中的一致，否则rc会不停地创建pod，所以个API server会检查这个点，如果不一致视为配置出错。可以不指定label selector，这种情况下会自动用template里面的label来作为selector。  </p>
+<p>rc对于监控pod的变动是通过API server实现的，API server允许用户watch资源的变化，当rc注意到有新pod被创建或者删除的时候，这个创建或删除并不触发rc的去管理pod。rc会先用label selector查一遍自己管理的pod数目再作出反应。  </p>
+<p>rc和pod不是强绑定的，rc只会管理符合label selector的pod。如果改变了一个pod的label，就可以实现将其移入移出rc的功能。不过虽然pod和rc不绑定，但是还是可以通过pod的<code>metadata.ownerReferences</code>查询到它属于什么rc。  </p>
+<p>命令<code>kubectl edit rc &lt;rc_name&gt;</code>可以更改rc的yaml definition。这样可以更改rc的三个部分。但是如果单纯向扩展。可以用命令<code>kubectl scale rc &lt;rc_name&gt; --replica= </code>。  </p>
+<p>删除一个rc会一起删除这个rc管理的pod，但也可以不删除这些pod，这一点由<code>--cascade</code>选项控制。  </p>
+<h2 id="Replication-Set"><a href="#Replication-Set" class="headerlink" title="Replication Set"></a>Replication Set</h2><p>replication set是用来代替rc的，它几乎和rc一样，但是有更丰富的label selector支持。但是rs和rc一般也不都直接被创建，而是由一种更高级的资源deployment(Ch9)来自动创建它们。  </p>
+<p>一个rs 的yaml definition。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line">apiVersion: apps&#x2F;v1beta2</span><br><span class="line">kind: ReplicaSet</span><br><span class="line">metadata:</span><br><span class="line">  name: kubia</span><br><span class="line">spec:</span><br><span class="line">  replicas: 3</span><br><span class="line">  selector:</span><br><span class="line">    matchLabels:</span><br><span class="line">      app: kubia</span><br><span class="line">  template:</span><br><span class="line">    metadata:</span><br><span class="line">      labels:</span><br><span class="line">        app: kubia</span><br><span class="line">    spec:</span><br><span class="line">      containers:</span><br><span class="line">      - name: kubia</span><br><span class="line">        image: luksa&#x2F;kubia</span><br></pre></td></tr></table></figure>
+<p>从这个yaml可以看出几点，一是rs的API版本不是v1而是apps/v1beta，apps是API group，v1beta是API version；其次是label selector用的是一个matchLabels。现在这个rs和之前的rc没有任何区别。但是rs提供下面的label selector已支持更丰富的label匹配。  </p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">selector:</span><br><span class="line">  matchExpressions:</span><br><span class="line">    - key: app </span><br><span class="line">      operator: In </span><br><span class="line">      values:</span><br><span class="line">	- kubia</span><br></pre></td></tr></table></figure>
+<p>这个operator可以在<code>In</code>, <code>NotIn</code>, <code>Exitsts</code>, <code>DoesNotExist</code>中取值。如果使用的多个表达式和matchLabel，那么必须同时满足所有表达式才算匹配。  </p>
+<h2 id="DaemonSets"><a href="#DaemonSets" class="headerlink" title="DaemonSets"></a>DaemonSets</h2><p>rc和rs只能控制pod的数目，但是如果希望每个node都能部署一个且仅一个pod这种需求它们满足不了。DaemonSets可以解决这个问题。<br>DaemonSets创建的pods因为已经有了target node所以不需要Scheduler调度。  </p>
+<p>DaemonSets也可以只在部分nodes上创建pod，这一项由pod template中的nodeSelector来管理。DaemonSets创建的pod忽略node的unschedulable状态，因为DaemonSets创建的pod不走Scheduler。而且这也很合理，因为DaemonSet管理的一般是系统服务，这些服务不关心这个node上是不是有pod。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">apiVersion: apps&#x2F;v1beta2</span><br><span class="line">kind: DaemonSet</span><br><span class="line">metadata:</span><br><span class="line">  name: ssd-monitor </span><br><span class="line">spec:</span><br><span class="line">  selector:</span><br><span class="line">    matchLabels:</span><br><span class="line">      app: ssd-monitor </span><br><span class="line">template:</span><br><span class="line">    metadata:</span><br><span class="line">      labels:</span><br><span class="line">        app: ssd-monitor </span><br><span class="line">spec:</span><br><span class="line">      nodeSelector:</span><br><span class="line">        disk: ssd</span><br><span class="line">      containers:</span><br><span class="line">        - name: main</span><br><span class="line">          image: luksa&#x2F;ssd-monitor</span><br></pre></td></tr></table></figure>
+
+<h2 id="Job"><a href="#Job" class="headerlink" title="Job"></a>Job</h2><p>之前的pod都是持续运行的，如果希望一个pod执行完工作就终止就需要Job这种资源。<br>Job的容器当进程正常结束之后不会重启，而是被视为完成了。如果因为node崩溃这种情况造成由job管理的pod崩溃，job会在另外的node上重启一个pod重新做任务。如果是pod内的进程执行失败，job可能会重试任务或者什么也不做。  </p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">apiVersion: batch&#x2F;v1</span><br><span class="line">kind: Job</span><br><span class="line">metadata:</span><br><span class="line">  name: batch-job </span><br><span class="line">spec:</span><br><span class="line">  template:</span><br><span class="line">    metadata:</span><br><span class="line">      labels:</span><br><span class="line">        app: batch-job </span><br><span class="line">    spec:</span><br><span class="line">      restartPolicy: OnFailure </span><br><span class="line">      containers:</span><br><span class="line">        - name: main</span><br><span class="line">          image: luksa&#x2F;batch-job</span><br></pre></td></tr></table></figure>
+<p>restartPolicy的默认值的<code>Always</code>，这是所有Pod的默认值。但是由Job管理的Pod不能设置为该值，因为它设计的目的是为一次性任务服务。可以配置为<code>OnFailure</code>或者<code>Never</code>。<br>一个Job可以管理多个pod，这样可以并行或者顺序地执行多个任务，通过设置Job spec的<code>completions</code>或者<code>parallelism</code>来做到。如果设置<code>completions=5</code>，那么job就会顺序地运行5个pod。可以同时设置这两个属性使得Job并行地运行多个任务。还可以在Job工作期间热更新并行数。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">kubectl scale job multi-completion-batch-job --replicas 3</span><br></pre></td></tr></table></figure>
+<p>限制Job中的任务的完成时间通过设置spec的<code>activeDeadlineSeconds</code>做到，重试上限通过<code>backoffLimit</code>设置。  </p>
+<p>Job资源在创建之后会立刻工作，如果由定期或者希望未来完成的任务，可以使用CronJob。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">apiVersion: batch&#x2F;v1beta1</span><br><span class="line">kind: CronJob</span><br><span class="line">metadata:</span><br><span class="line">  name: batch-job-every-fifteen-minutes </span><br><span class="line">spec:</span><br><span class="line">  schedule: &quot;0,15,30,45 * * * *&quot;</span><br><span class="line">  startingDeadlineSeconds: 15 \\因为CronJob不能精确地在设置时间执行，这里给一个延迟上限，超过会视为失败 </span><br><span class="line">  jobTemplate:</span><br><span class="line">    spec:</span><br><span class="line">      template:</span><br><span class="line">        metadata:</span><br><span class="line">          labels:</span><br><span class="line">            app: periodic-batch-job </span><br><span class="line">        spec:</span><br><span class="line">  	  restartPolicy: OnFailure </span><br><span class="line">          containers:</span><br><span class="line"> 	    - name: main</span><br><span class="line">	      image: luksa&#x2F;batch-job</span><br></pre></td></tr></table></figure>
+<p>一般情况下，CronJob只会创建一个Job。但存在两个Job被同时创建或者有时候没有Job被创建的情况。因此需要保证你的任务的幂等的，并且任务可以完成上一轮没有做的工作。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/04/03/K8s-in-Action-Pods/" rel="prev" title="K8s Pods">
+      <i class="fa fa-chevron-left"></i> K8s Pods
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2021/04/05/K8s-in-Action-Services/" rel="next" title="K8s Services">
+      K8s Services <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#Replication-Controller"><span class="nav-number">1.</span> <span class="nav-text">Replication Controller</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Replication-Set"><span class="nav-number">2.</span> <span class="nav-text">Replication Set</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#DaemonSets"><span class="nav-number">3.</span> <span class="nav-text">DaemonSets</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Job"><span class="nav-number">4.</span> <span class="nav-text">Job</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Who Ru</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">10</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+        <span class="site-state-item-count">2</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2021</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Who Ru</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://muse.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Muse</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>
